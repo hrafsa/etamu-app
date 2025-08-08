@@ -1,4 +1,4 @@
-package com.coba
+package com.etamu
 
 import android.app.Application
 import com.facebook.react.PackageList
