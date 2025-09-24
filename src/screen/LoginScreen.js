@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 function LoginScreen({navigation, route}) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [modalVisible2, setModalVisible2] = useState(false);
@@ -37,7 +37,7 @@ function LoginScreen({navigation, route}) {
   );
 
   function handleLogin() {
-    if (username && password) {
+    if (email && password) {
       setModalVisible(true);
     }
   }
@@ -65,7 +65,7 @@ function LoginScreen({navigation, route}) {
         </Text>
 
         <Text style={{textAlign: 'center', fontSize: 14, flex: 1}}>
-          Silahkan masukkan username dan password anda
+          Silahkan masukkan email dan password anda
         </Text>
         <View
           style={{
@@ -134,10 +134,10 @@ function LoginScreen({navigation, route}) {
               borderLeftWidth: 1,
               borderColor: '#CFCFCF',
             }}>
-            <Icon name="person-outline" size={25} color="#A6A6A6" />
+            <Icon name="mail" size={25} color="#A6A6A6" />
           </View>
           <TextInput
-            value={username}
+            value={email}
             style={{
               flex: 1,
               backgroundColor: '#FFFFFF',
@@ -149,8 +149,8 @@ function LoginScreen({navigation, route}) {
               borderRightWidth: 1,
               borderColor: '#CFCFCF',
             }}
-            placeholder="Username"
-            onChangeText={Text => setUsername(Text)}
+            placeholder="Email Address"
+            onChangeText={Text => setEmail(Text)}
             secureTextEntry={false}
           />
         </View>
@@ -200,7 +200,7 @@ function LoginScreen({navigation, route}) {
             onPress={handleLogin}
             style={{
               flex: 1,
-              backgroundColor: username && password ? '#0386D0' : '#ccc',
+              backgroundColor: email && password ? '#0386D0' : '#ccc',
               marginHorizontal: 30,
               marginTop: 40,
               paddingVertical: 15,
@@ -208,7 +208,7 @@ function LoginScreen({navigation, route}) {
               justifyContent: 'center',
               alignItems: 'center',
             }}
-            disabled={!username || !password}>
+            disabled={!email || !password}>
             <Text
               style={{
                 color: '#FFFFFF',

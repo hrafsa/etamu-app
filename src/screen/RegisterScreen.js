@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 function RegisterScreen({navigation}) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [user, setUser] = useState('');
   const [phone, setPhone] = useState('');
@@ -20,7 +20,7 @@ function RegisterScreen({navigation}) {
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleRegister = () => {
-    if (username && password && user && phone && fixpassword) {
+    if (email && password && user && phone && fixpassword) {
       setModalVisible(true);
     }
   };
@@ -206,10 +206,10 @@ function RegisterScreen({navigation}) {
               borderLeftWidth: 1,
               borderColor: '#CFCFCF',
             }}>
-            <Icon name="person-outline" size={25} color="#A6A6A6" />
+            <Icon name="mail" size={25} color="#A6A6A6" />
           </View>
           <TextInput
-            value={username}
+            value={email}
             style={{
               flex: 1,
               backgroundColor: '#FFFFFF',
@@ -221,8 +221,8 @@ function RegisterScreen({navigation}) {
               borderRightWidth: 1,
               borderColor: '#CFCFCF',
             }}
-            placeholder="Username"
-            onChangeText={Text => setUsername(Text)}
+            placeholder="Email Address"
+            onChangeText={Text => setEmail(Text)}
             secureTextEntry={false}
           />
         </View>
@@ -317,7 +317,7 @@ function RegisterScreen({navigation}) {
             style={{
               flex: 1,
               backgroundColor:
-                username && password && user && phone && fixpassword
+                email && password && user && phone && fixpassword
                   ? '#0386D0'
                   : '#ccc',
               marginHorizontal: 30,
@@ -369,7 +369,7 @@ function RegisterScreen({navigation}) {
                     textAlign: 'center',
                     marginBottom: 3,
                   }}>
-                  Silahkan lakukan login dengan username dan password yang sudah
+                  Silahkan lakukan login dengan email dan password yang sudah
                   dibuat
                 </Text>
                 <TouchableOpacity

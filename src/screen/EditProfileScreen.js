@@ -20,7 +20,7 @@ function EditProfileScreen({navigation}) {
 
   const [user, setUser] = useState('');
   const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
 
   return (
     <View
@@ -163,7 +163,7 @@ function EditProfileScreen({navigation}) {
               fontSize: 15,
               marginTop: 20,
             }}>
-            Username (jika ingin diganti)
+            Email Address (jika ingin diganti)
           </Text>
           <TextInput
             style={{
@@ -176,9 +176,9 @@ function EditProfileScreen({navigation}) {
               paddingHorizontal: 10,
               marginBottom: 10,
             }}
-            placeholder="Silahkan masukkan username baru"
-            value={username}
-            onChangeText={setUsername}></TextInput>
+            placeholder="Silahkan masukkan email baru"
+            value={email}
+            onChangeText={setEmail}></TextInput>
         </View>
 
         <TouchableOpacity

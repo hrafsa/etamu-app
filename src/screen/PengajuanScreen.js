@@ -14,6 +14,7 @@ function PengajuanScreen({navigation}) {
   const [pendaftar, setPendaftar] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [nomor, setNomor] = useState('');
+  const [email, setEmail] = useState('');
 
   return (
     <View
@@ -45,7 +46,7 @@ function PengajuanScreen({navigation}) {
         style={{
           backgroundColor: '#F6F6F6',
           width: 360,
-          height: 490,
+          height: 570,
           alignSelf: 'center',
           borderRadius: 15,
           marginVertical: 10,
@@ -135,7 +136,7 @@ function PengajuanScreen({navigation}) {
                   color: '#494949',
                   fontSize: 14,
                 }}>
-                Nomor Whatsapp Pendaftar
+                Nomor Whatsapp Instansi / Pendaftar
               </Text>
               <TextInput
                 style={{
@@ -155,6 +156,28 @@ function PengajuanScreen({navigation}) {
                 keyboardType="phone-pad"
                 maxLength={15}
               />
+            </View>
+
+            <View style={{marginTop: 20}}>
+              <Text
+                style={{
+                  fontFamily: 'DMSans-Regular',
+                  color: '#494949',
+                  fontSize: 14,
+                }}>
+                Email Instansi / Pendaftar
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: '#FFFF',
+                  borderRadius: 15,
+                  borderWidth: 1,
+                  borderColor: '#E9E9E9',
+                  height: 45,
+                  paddingHorizontal: 10,
+                }}
+                value={email}
+                onChangeText={setEmail}></TextInput>
             </View>
 
             <View

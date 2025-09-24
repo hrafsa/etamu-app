@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 function ForgotPassScreen({navigation, route}) {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0]; // State animasi
 
@@ -26,8 +26,8 @@ function ForgotPassScreen({navigation, route}) {
   };
 
   const handleBerhasil = () => {
-    if (phone) {
-      setPhone(''); // Kosongkan inputan
+    if (email) {
+      setEmail(''); // Kosongkan inputan
       setModalVisible(true); // Tampilkan modal
 
       // Jalankan animasi fade-in
@@ -90,8 +90,8 @@ function ForgotPassScreen({navigation, route}) {
         </Text>
 
         <Text style={{textAlign: 'center', fontSize: 14}}>
-          Silahkan masukkan nomor telephone WA anda untuk mendapatkan password
-          anda
+          Silahkan masukkan Email anda yang didaftarkan untuk mendapatkan
+          password anda
         </Text>
 
         <View
@@ -115,10 +115,10 @@ function ForgotPassScreen({navigation, route}) {
               borderLeftWidth: 1,
               borderColor: '#CFCFCF',
             }}>
-            <Icon name="phone" size={25} color="#A6A6A6" />
+            <Icon name="mail" size={25} color="#A6A6A6" />
           </View>
           <TextInput
-            value={phone}
+            value={email}
             style={{
               flex: 1,
               backgroundColor: '#FFFFFF',
@@ -130,14 +130,11 @@ function ForgotPassScreen({navigation, route}) {
               borderRightWidth: 1,
               borderColor: '#CFCFCF',
             }}
-            placeholder="Nomor Telepon WA"
-            onChangeText={text => {
-              // Filter hanya angka
-              const numericText = text.replace(/[^0-9]/g, '');
-              setPhone(numericText);
-            }}
-            keyboardType="phone-pad"
-            maxLength={15}
+            placeholder="Email Address"
+            onChangeText={Text => setEmail(Text)}
+            secureTextEntry={false}
+            //keyboardType="email-pad"
+            //maxLength={15}
           />
         </View>
 
@@ -145,7 +142,7 @@ function ForgotPassScreen({navigation, route}) {
           <TouchableOpacity
             onPress={handleBerhasil}
             style={{
-              backgroundColor: phone ? '#0386D0' : '#ccc',
+              backgroundColor: email ? '#0386D0' : '#ccc',
               marginHorizontal: 30,
               marginTop: 40,
               paddingVertical: 15,
@@ -153,7 +150,7 @@ function ForgotPassScreen({navigation, route}) {
               justifyContent: 'center',
               alignItems: 'center',
             }}
-            disabled={!phone}>
+            disabled={!email}>
             <Text
               style={{
                 color: '#FFFFFF',
@@ -197,7 +194,7 @@ function ForgotPassScreen({navigation, route}) {
                     textAlign: 'center',
                     marginBottom: 3,
                   }}>
-                  Silahkan cek WA anda untuk melihat password anda yang sudah
+                  Silahkan cek Email anda untuk melihat password anda yang sudah
                   dikirim
                 </Text>
                 <TouchableOpacity
@@ -224,7 +221,7 @@ function ForgotPassScreen({navigation, route}) {
 
           <View style={{marginHorizontal: 10, marginVertical: 20}}>
             <Text style={{fontFamily: 'DMSans-Regular', fontSize: 13}}>
-              * Harap masukkan nomor telephone WA anda dengan benar
+              * Harap masukkan Email anda dengan benar
             </Text>
           </View>
           <View

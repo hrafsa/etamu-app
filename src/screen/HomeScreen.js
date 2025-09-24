@@ -380,6 +380,10 @@ function HomeScreen({navigation}) {
                     08123456789
                   </Text>
                   <Text style={styles.modalKeterangan2}>
+                    <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
+                    user123@gmail.com
+                  </Text>
+                  <Text style={styles.modalKeterangan2}>
                     <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
                     Dewan Komisi E
                   </Text>
@@ -602,6 +606,10 @@ function HomeScreen({navigation}) {
                   08123576890
                 </Text>
                 <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
+                  dprdsemarang123@gmail.com
+                </Text>
+                <Text style={styles.modalKeterangan2}>
                   <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
                   Bagian Umum
                 </Text>
@@ -765,6 +773,10 @@ function HomeScreen({navigation}) {
                   <Text style={styles.modalKeterangan2}>
                     <Text style={{fontWeight: 'bold'}}>Nomor WA : </Text>
                     08139987009
+                  </Text>
+                  <Text style={styles.modalKeterangan2}>
+                    <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
+                    dprdjambi123@gmail.com
                   </Text>
                   <Text style={styles.modalKeterangan2}>
                     <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>

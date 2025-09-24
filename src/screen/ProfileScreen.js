@@ -21,7 +21,7 @@ function ProfileScreen({navigation}) {
 
   const [user, setUser] = useState('');
   const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   useEffect(() => {
@@ -184,7 +184,7 @@ function ProfileScreen({navigation}) {
                 fontSize: 15,
                 marginTop: 10,
               }}>
-              Username
+              Email
             </Text>
             <Text
               style={{
@@ -194,7 +194,7 @@ function ProfileScreen({navigation}) {
                 marginLeft: 10,
                 fontWeight: 'bold',
               }}>
-              User_123
+              user123@gmail.com
             </Text>
 
             <Text
@@ -248,8 +248,7 @@ function ProfileScreen({navigation}) {
 
           <View style={{marginTop: 20}}>
             <Text style={{fontFamily: 'DMSans-Regular'}}>
-              * Harap diingat Username dan Password yang Anda buat untuk akun
-              ini
+              * Harap diingat email dan Password yang Anda buat untuk akun ini
             </Text>
           </View>
         </View>

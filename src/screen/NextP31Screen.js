@@ -68,7 +68,7 @@ function NextP31Screen({navigation}) {
         style={{
           backgroundColor: '#F6F6F6',
           width: 360,
-          height: 660,
+          height: 650,
           alignSelf: 'center',
           borderRadius: 15,
           marginVertical: 10,
