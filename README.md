@@ -1,97 +1,171 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# E-Tamu
 
-# Getting Started
+Aplikasi mobile **E-Tamu** adalah sistem manajemen kunjungan tamu untuk DPRD. Aplikasi ini dibangun menggunakan [**React Native**](https://reactnative.dev) dan terhubung dengan backend **Laravel API**.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 📱 Fitur Utama
 
-## Step 1: Start Metro
+- **Autentikasi** - Login, Register, Logout dengan token-based authentication
+- **Pengajuan Kunjungan** - Membuat pengajuan kunjungan baru dengan upload dokumen
+- **Status Pengajuan** - Melihat status pengajuan (pending, disetujui, ditolak)
+- **Riwayat Kunjungan** - Melihat riwayat pengajuan dengan filter bulan & tahun
+- **Profile** - Melihat dan mengedit profil pengguna
+- **Notifikasi** - Menerima notifikasi terkait pengajuan
+- **Panduan** - Panduan penggunaan aplikasi
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 🛠️ Tech Stack
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **React Native** 0.77.0
+- **React Navigation** - Navigasi antar halaman
+- **Axios** - HTTP client untuk API calls
+- **AsyncStorage** - Penyimpanan lokal untuk token & data user
+- **React Native Vector Icons** - Icon library
+- **React Native Date Picker** - Pemilihan tanggal & waktu
+- **React Native Document Picker** - Upload dokumen (PDF, JPG, PNG)
+- **React Native Element Dropdown** - Dropdown untuk kategori & sub-kategori
+
+## 📋 Prerequisites
+
+- Node.js >= 18
+- React Native CLI
+- Android Studio (untuk Android)
+- Xcode (untuk iOS - macOS only)
+- Backend Laravel API yang berjalan
+
+## 🚀 Getting Started
+
+### 1. Clone & Install Dependencies
 
 ```sh
-# Using npm
+git clone <repository-url>
+cd E-Tamu
+npm install
+```
+
+### 2. Konfigurasi API
+
+Ubah base URL API di `src/api/client.js`:
+
+```javascript
+// Untuk Android Emulator
+const API_BASE_URL = 'http://10.0.2.2:8000/api';
+
+// Untuk perangkat fisik, gunakan IP komputer Anda
+// const API_BASE_URL = 'http://192.168.x.x:8000/api';
+```
+
+### 3. Jalankan Metro Bundler
+
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+### 4. Build & Run Aplikasi
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+#### Android
 
 ```sh
-# Using npm
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+#### iOS (macOS only)
 
 ```sh
+# Install CocoaPods dependencies
 bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
 bundle exec pod install
+
+# Run aplikasi
+npm run ios
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## 📁 Struktur Proyek
+
+```
+E-Tamu/
+├── src/
+│   ├── api/
+│   │   └── client.js          # Axios instance & API configuration
+│   ├── auth/
+│   │   └── AuthContext.js     # Authentication context & state management
+│   ├── pengajuan/
+│   │   └── PengajuanContext.js # Pengajuan state management
+│   └── screen/
+│       ├── HomeScreen.js       # Halaman utama dengan list kunjungan
+│       ├── LoginScreen.js      # Halaman login
+│       ├── RegisterScreen.js   # Halaman registrasi
+│       ├── ProfileScreen.js    # Halaman profil pengguna
+│       ├── PengajuanScreen.js  # Halaman pengajuan kunjungan
+│       ├── StsPengajuanScreen.js # Status pengajuan
+│       ├── RiwayatScreen.js    # Riwayat pengajuan
+│       └── ...
+├── assets/
+│   ├── fonts/                  # Custom fonts
+│   ├── icon/                   # Icon assets
+│   └── image/                  # Image assets
+├── android/                    # Android native code
+├── ios/                        # iOS native code
+└── __tests__/                  # Unit tests
+```
+
+## 🔌 API Endpoints
+
+Aplikasi ini terhubung dengan Laravel API dengan endpoint berikut:
+
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/login` | POST | Login pengguna |
+| `/register` | POST | Registrasi pengguna baru |
+| `/logout` | POST | Logout pengguna |
+| `/profile` | GET | Mendapatkan data profil |
+| `/profile` | PATCH | Update profil pengguna |
+| `/categories` | GET | Daftar kategori |
+| `/categories/{id}/sub-categories` | GET | Daftar sub-kategori |
+| `/pengajuan` | GET | Daftar pengajuan |
+| `/pengajuan` | POST | Membuat pengajuan baru |
+| `/pengajuan/{nomor}` | GET | Detail pengajuan |
+| `/pengajuan/years` | GET | Daftar tahun tersedia |
+
+## 🧪 Testing
 
 ```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+npm test
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 📝 Scripts
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+| Script | Deskripsi |
+|--------|-----------|
+| `npm start` | Menjalankan Metro bundler |
+| `npm run android` | Build & run di Android |
+| `npm run ios` | Build & run di iOS |
+| `npm run lint` | Menjalankan ESLint |
+| `npm test` | Menjalankan Jest tests |
 
-## Step 3: Modify your app
+## 🐛 Troubleshooting
 
-Now that you have successfully run the app, let's make changes!
+### Gradle Build Error (Windows)
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Jika mengalami error Gradle pada Windows, coba:
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+```sh
+cd android
+gradlew.bat clean
+cd ..
+npm run android
+```
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### Metro Bundler Cache
 
-## Congratulations! :tada:
+Jika ada masalah dengan cache:
 
-You've successfully run and modified your React Native App. :partying_face:
+```sh
+npm start -- --reset-cache
+```
 
-### Now what?
+## 📄 License
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+Private Project - DPRD
 
-# Troubleshooting
+---
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Dibuat dengan ❤️ menggunakan React Native
