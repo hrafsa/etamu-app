@@ -10,17 +10,80 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import api from '../api/client';
 
 function EditProfileScreen({navigation}) {
   const [modalVisible, setModalVisible] = useState(false);
 
-  const handleBerhasil = () => {
-    setModalVisible(true);
-  };
-
   const [user, setUser] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const normalizePhone = (value) => {
+    const digits = (value || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+    if (digits.startsWith('+62')) return digits.replace(/^\+/, '');
+    return digits;
+  };
+
+  const fetchProfile = async () => {
+    if (loadingProfile) return;
+    setLoadingProfile(true);
+    setErrorMsg('');
+    setFieldErrors({});
+    try {
+      const res = await api.get('/profile');
+      const p = res.data?.user || res.data?.data || res.data;
+      setUser(p?.name || '');
+      setEmail(p?.email || '');
+      setPhone(p?.phone || '');
+    } catch (e) {
+      setErrorMsg(e?.message || 'Gagal memuat profil');
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const handleBerhasil = async () => {
+    if (saving) return;
+    setErrorMsg('');
+    setFieldErrors({});
+    setSaving(true);
+    try {
+      const payload = {
+        name: user,
+        email: email,
+        phone: normalizePhone(phone),
+      };
+      const res = await api.patch('/profile', payload);
+      // Tampilkan modal sukses; ProfileScreen akan refresh saat kembali
+      setModalVisible(true);
+    } catch (e) {
+      const apiErrors = e?.data?.errors;
+      if (apiErrors && typeof apiErrors === 'object') {
+        const parsed = {};
+        Object.entries(apiErrors).forEach(([k, v]) => {
+          if (Array.isArray(v)) parsed[k] = v[0];
+          else if (typeof v === 'string') parsed[k] = v;
+        });
+        setFieldErrors(parsed);
+        setErrorMsg(e?.data?.message || 'Gagal menyimpan perubahan');
+      } else {
+        setErrorMsg(e?.message || 'Gagal menyimpan perubahan');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View
@@ -120,13 +183,19 @@ function EditProfileScreen({navigation}) {
               backgroundColor: '#FFFF',
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: '#B1B1B1',
+              borderColor: fieldErrors.name ? '#C32A2A' : '#B1B1B1',
               height: 45,
               paddingHorizontal: 10,
             }}
             placeholder="Silahkan masukkan nama lengkap"
             value={user}
-            onChangeText={setUser}></TextInput>
+            onChangeText={t => {
+              setUser(t);
+              if (fieldErrors.name) setFieldErrors(prev => ({...prev, name: undefined}));
+            }}></TextInput>
+          {!!fieldErrors.name && (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.name}</Text>
+          )}
           <Text
             style={{
               color: '#000',
@@ -142,20 +211,23 @@ function EditProfileScreen({navigation}) {
               backgroundColor: '#FFFF',
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: '#B1B1B1',
+              borderColor: fieldErrors.phone ? '#C32A2A' : '#B1B1B1',
               height: 45,
               paddingHorizontal: 10,
             }}
             placeholder="Silahkan masukkan Nomor WA"
             value={phone}
             onChangeText={text => {
-              // Filter hanya angka
-              const numericText = text.replace(/[^0-9]/g, '');
-              setPhone(numericText);
+              const normalized = normalizePhone(text);
+              setPhone(normalized);
+              if (fieldErrors.phone) setFieldErrors(prev => ({...prev, phone: undefined}));
             }}
             keyboardType="phone-pad"
             maxLength={15}
           />
+          {!!fieldErrors.phone && (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.phone}</Text>
+          )}
           <Text
             style={{
               color: '#000',
@@ -171,14 +243,20 @@ function EditProfileScreen({navigation}) {
               backgroundColor: '#FFFF',
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: '#B1B1B1',
+              borderColor: fieldErrors.email ? '#C32A2A' : '#B1B1B1',
               height: 45,
               paddingHorizontal: 10,
               marginBottom: 10,
             }}
             placeholder="Silahkan masukkan email baru"
             value={email}
-            onChangeText={setEmail}></TextInput>
+            onChangeText={t => {
+              setEmail(t);
+              if (fieldErrors.email) setFieldErrors(prev => ({...prev, email: undefined}));
+            }}></TextInput>
+          {!!fieldErrors.email && (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.email}</Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -191,8 +269,9 @@ function EditProfileScreen({navigation}) {
             borderRadius: 10,
             justifyContent: 'center',
             alignItems: 'center',
+            opacity: saving ? 0.8 : 1,
           }}
-          disabled={!user}>
+          disabled={!user || saving}>
           <Text
             style={{
               color: '#FFFFFF',
@@ -200,7 +279,7 @@ function EditProfileScreen({navigation}) {
               fontWeight: 'semi-bold',
               fontSize: 18,
             }}>
-            Kirim
+            {saving ? 'Menyimpan...' : 'Simpan'}
           </Text>
         </TouchableOpacity>
 

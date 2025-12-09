@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DocumentPicker from 'react-native-document-picker';
 import {
@@ -11,15 +11,27 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-//import React from 'react';
+import {usePengajuan} from '../pengajuan/PengajuanContext';
 
 function NextP51Screen({navigation}) {
+  const {form, setField, submitPengajuan, submitLoading, submitErrors, submitMessage, resetForm} = usePengajuan();
   const [isChecked, setIsChecked] = useState(false);
-  const [file, setFile] = useState([]);
-  const [inputText, setInputText] = useState('');
   const [modalVisible2, setModalVisible2] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+
+  const inputText = form.tujuan;
+  const file = form.dokumen ? [form.dokumen] : [];
+
+  const pickDocument = async () => {
+    try {
+      const res = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+      const f = res[0];
+      setField('dokumen', { uri: f.uri, name: f.name, type: f.type, size: f.size });
+    } catch (err) {
+      if (!DocumentPicker.isCancel(err)) { console.log('Error saat memilih file:', err); }
+    }
+  };
 
   const handleSubmit = () => {
     if (inputText && file.length > 0 && isChecked) {
@@ -29,22 +41,15 @@ function NextP51Screen({navigation}) {
     }
   };
 
-  const pickDocument = async () => {
-    try {
-      const res = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
-      });
-
-      setFile(res); // Menyimpan file pertama yang dipilih
-    } catch (err) {
-      if (DocumentPicker.isCancel(err)) {
-        console.log('Pemilihan file dibatalkan');
-      } else {
-        console.log('Error saat memilih file:', err);
-      }
+  const confirmSend = async () => {
+    setModalVisible(false);
+    const result = await submitPengajuan();
+    if (result.ok) {
+      setSuccessModalVisible(true);
     }
   };
 
+  const hasErrors = !successModalVisible && !!Object.values(submitErrors || {}).some(Boolean);
   return (
     <View
       style={{
@@ -90,6 +95,15 @@ function NextP51Screen({navigation}) {
               Tujuan Bertamu dan Dokumen Surat Tugas atau Surat Pemberitahuan
             </Text>
 
+            {/* Validation summary */}
+            {hasErrors && (
+              <View style={{marginTop: 12, backgroundColor: '#FFE9E9', borderWidth: 1, borderColor: '#C32A2A', borderRadius: 8, padding: 10}}>
+                {Object.entries(submitErrors || {}).map(([k, v]) => (
+                  v ? <Text key={k} style={{color:'#C32A2A', fontSize:12}}>• {String(v)}</Text> : null
+                ))}
+              </View>
+            )}
+
             <View style={{marginTop: 30}}>
               <Text
                 style={{
@@ -104,7 +118,7 @@ function NextP51Screen({navigation}) {
                   backgroundColor: '#FFFF',
                   borderRadius: 15,
                   borderWidth: 1,
-                  borderColor: '#E9E9E9',
+                  borderColor: submitErrors.tujuan ? '#C32A2A' : '#E9E9E9',
                   height: 150,
                   paddingHorizontal: 10,
                   textAlignVertical: 'top',
@@ -112,7 +126,8 @@ function NextP51Screen({navigation}) {
                 }}
                 multiline={true}
                 value={inputText}
-                onChangeText={setInputText}></TextInput>
+                onChangeText={v => setField('tujuan', v)} />
+              {!!submitErrors.tujuan && <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.tujuan}</Text>}
             </View>
 
             <View style={{marginTop: 20}}>
@@ -130,7 +145,7 @@ function NextP51Screen({navigation}) {
                   color: '#C10000',
                   fontSize: 13,
                 }}>
-                (Format file pdf,jpg,png,jpeg dan maksimal 35mb)
+                (Format file pdf,jpg,png,jpeg dan maksimal 2MB)
               </Text>
               <View style={{marginTop: 10}}>
                 <TouchableOpacity
@@ -188,16 +203,16 @@ function NextP51Screen({navigation}) {
                   <Text
                     style={{
                       fontFamily: 'DMSans-Regular',
-                      color: '#000',
+                      color: submitErrors.dokumen ? '#C32A2A' : '#000',
                       fontSize: 14,
                       backgroundColor: '#FFFF',
                       padding: 10,
                       marginTop: 5,
                       borderWidth: 1,
-                      borderColor: '#D8D8D8',
+                      borderColor: submitErrors.dokumen ? '#C32A2A' : '#D8D8D8',
                       textAlign: 'center',
                     }}>
-                    Tidak ada file yang dipilih
+                    {submitErrors.dokumen ? submitErrors.dokumen : 'Tidak ada file yang dipilih'}
                   </Text>
                 )}
               </View>
@@ -275,8 +290,9 @@ function NextP51Screen({navigation}) {
               <View>
                 <TouchableOpacity
                   onPress={handleSubmit}
+                  disabled={submitLoading}
                   style={{
-                    backgroundColor: '#0386D0',
+                    backgroundColor: submitLoading ? '#6aaed3' : '#0386D0',
                     alignItems: 'center',
                     width: 75,
                     height: 35,
@@ -290,7 +306,7 @@ function NextP51Screen({navigation}) {
                       color: '#FFFF',
                       fontSize: 14,
                     }}>
-                    Send
+                    {submitLoading ? '...' : 'Send'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -340,10 +356,7 @@ function NextP51Screen({navigation}) {
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => {
-                          setModalVisible(false);
-                          setSuccessModalVisible(true);
-                        }}
+                        onPress={confirmSend}
                         style={{
                           padding: 10,
                           backgroundColor: '#007bff',
@@ -393,6 +406,7 @@ function NextP51Screen({navigation}) {
                     <TouchableOpacity
                       onPress={() => {
                         setSuccessModalVisible(false);
+                        resetForm();
                         navigation.navigate('StsPengajuan');
                       }}
                       style={{

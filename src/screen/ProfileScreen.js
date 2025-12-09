@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useRef} from 'react';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {
   View,
@@ -11,6 +11,9 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
+import {useAuth} from '../auth/AuthContext';
+import api from '../api/client';
+import {useFocusEffect} from '@react-navigation/native';
 
 function ProfileScreen({navigation}) {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
@@ -24,34 +27,71 @@ function ProfileScreen({navigation}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1, // Fade in ke tampilan normal
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const {logout} = useAuth();
+
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const fetchingRef = useRef(false); // guard to prevent overlapping calls
+
+  const fetchProfile = async () => {
+    if (fetchingRef.current || loadingProfile) return;
+    fetchingRef.current = true;
+    setLoadingProfile(true);
+    setProfileError('');
+    try {
+      const res = await api.get('/profile');
+      const p = res.data?.user || res.data?.data || res.data;
+      if (p) {
+        setUser(p.name || '');
+        setEmail(p.email || '');
+        setPhone(p.phone || '');
+      } else {
+        setProfileError('Data profil tidak tersedia');
+      }
+    } catch (e) {
+      setProfileError(e?.message || 'Gagal memuat profil');
+    } finally {
+      setLoadingProfile(false);
+      fetchingRef.current = false;
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfile();
+    }, [])
+  );
 
   const handleKeluar = () => {
     setModalVisible(true);
   };
 
+  const onConfirmLogout = async () => {
+    // Tutup modal lalu lakukan logout (akan memicu switch ke AuthStack)
+    setModalVisible(false);
+    try {
+      await logout();
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
-
-    // Animasi fade ke putih penuh lalu kembali normal dengan durasi lebih panjang
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0, // Layar menjadi putih penuh
-        duration: 350,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1, // Kembali normal
-        duration: 650,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setRefreshing(false)); // Pastikan refresh berhenti setelah animasi
+    fetchProfile().finally(() => {
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setRefreshing(false));
+    });
   };
 
   return (
@@ -107,7 +147,7 @@ function ProfileScreen({navigation}) {
               fontSize: 20,
               flex: 1,
             }}>
-            Nama User
+            {loadingProfile ? 'Memuat...' : (user || '-')}
           </Text>
           <TouchableOpacity
             onPress={() => navigation.navigate('EditProfile')}
@@ -156,8 +196,9 @@ function ProfileScreen({navigation}) {
                 marginLeft: 10,
                 fontWeight: 'bold',
               }}>
-              Nama User
+              {user || '-'}
             </Text>
+            {/* Nomor Whatsapp */}
             <Text
               style={{
                 color: '#000',
@@ -175,8 +216,9 @@ function ProfileScreen({navigation}) {
                 marginLeft: 10,
                 fontWeight: 'bold',
               }}>
-              081376559822
+              {phone || '-'}
             </Text>
+            {/* Email */}
             <Text
               style={{
                 color: '#000',
@@ -194,41 +236,11 @@ function ProfileScreen({navigation}) {
                 marginLeft: 10,
                 fontWeight: 'bold',
               }}>
-              user123@gmail.com
+              {email || '-'}
             </Text>
-
-            <Text
-              style={{
-                color: '#000',
-                fontFamily: 'DMSans-Regular',
-                fontSize: 15,
-                marginTop: 10,
-                flex: 1,
-              }}>
-              Password
-            </Text>
-
-            <View style={{flexDirection: 'row'}}>
-              <Text
-                style={{
-                  color: '#000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 15,
-                  marginLeft: 10,
-                  fontWeight: 'bold',
-                  flex: 1,
-                }}>
-                {isPasswordVisible ? 'Pass_123' : '*****'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-                <Icon
-                  name={isPasswordVisible ? 'visibility-off' : 'visibility'}
-                  size={20}
-                  color="#000"
-                />
-              </TouchableOpacity>
-            </View>
+            {profileError ? (
+              <Text style={{color:'#C32A2A', marginTop:10}}>{profileError}</Text>
+            ) : null}
 
             <TouchableOpacity
               onPress={() => navigation.navigate('UbahPass')}
@@ -365,10 +377,7 @@ function ProfileScreen({navigation}) {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => {
-                    setModalVisible(false);
-                    setSuccessModalVisible(true);
-                  }}
+                  onPress={onConfirmLogout}
                   style={{
                     padding: 10,
                     backgroundColor: '#007bff',
@@ -381,7 +390,7 @@ function ProfileScreen({navigation}) {
           </View>
         </Modal>
 
-        {/* Modal Sukses */}
+        {/* Modal Sukses - opsional; setelah logout, stack akan berpindah ke AuthStack */}
         <Modal transparent={true} visible={successModalVisible}>
           <View
             style={{

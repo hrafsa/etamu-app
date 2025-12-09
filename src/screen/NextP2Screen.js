@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,23 +8,38 @@ import {
   Modal,
   StyleSheet,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
+import {usePengajuan} from '../pengajuan/PengajuanContext';
 
 function NextP2Screen({navigation}) {
-  const [selected, setSelected] = useState('');
+  const {categories, fetchCategories, setField, form, loadingCategories} = usePengajuan();
+  const [selected, setSelected] = useState(form.kategori ? String(form.kategori) : '');
   const [modalVisible, setModalVisible] = useState(false);
 
-  const option = [
-    {id: 'AKD', label: 'AKD'},
-    {id: 'Sekertaris Dewan', label: 'Sekertaris Dewan'},
-  ];
+  // Fetch sekali setiap kali screen ini DIFOCUS-kan
+  useFocusEffect(
+    useCallback(() => {
+      fetchCategories({force: true});
+    }, [fetchCategories])
+  );
 
   const handleNext = () => {
-    if (selected === 'AKD') {
-      navigation.navigate('NextP31');
-    } else if (selected === 'Sekertaris Dewan') {
-      navigation.navigate('NextP32');
-    } else {
+    if (!selected) {
       setModalVisible(true);
+      return;
+    }
+    const cat = categories.find(c => String(c.id) === selected);
+    if (!cat) {
+      setModalVisible(true);
+      return;
+    }
+    setField('kategori', cat.id);
+    setField('kategori_name', cat.name);
+    // Gunakan ID untuk routing, pass categoryId agar screen berikut bisa fetch sub-kategori sendiri
+    if (Number(cat.id) === 1) {
+      navigation.navigate('NextP31', {categoryId: cat.id});
+    } else {
+      navigation.navigate('NextP32', {categoryId: cat.id});
     }
   };
 
@@ -76,20 +91,26 @@ function NextP2Screen({navigation}) {
         </View>
 
         <View>
-          {option.map(option => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.option}
-              onPress={() => setSelected(option.id)}>
-              <View
-                style={[
-                  styles.radio,
-                  selected === option.id && styles.radioSelected,
-                ]}
-              />
-              <Text style={styles.label}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {loadingCategories ? (
+            <Text style={{textAlign:'center', marginVertical:10}}>Memuat kategori...</Text>
+          ) : categories.length === 0 ? (
+            <Text style={{textAlign:'center', marginVertical:10}}>Tidak ada kategori.</Text>
+          ) : (
+            categories.map(option => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.option}
+                onPress={() => setSelected(String(option.id))}>
+                <View
+                  style={[
+                    styles.radio,
+                    selected === String(option.id) && styles.radioSelected,
+                  ]}
+                />
+                <Text style={styles.label}>{option.name}</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         <View

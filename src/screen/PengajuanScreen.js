@@ -8,13 +8,38 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import {usePengajuan} from '../pengajuan/PengajuanContext';
 
 function PengajuanScreen({navigation}) {
-  const [instansi, setInstansi] = useState('');
-  const [pendaftar, setPendaftar] = useState('');
-  const [jumlah, setJumlah] = useState('');
-  const [nomor, setNomor] = useState('');
-  const [email, setEmail] = useState('');
+  const {form, setField, submitErrors} = usePengajuan();
+  const [attempted, setAttempted] = useState(false);
+
+  // Normalisasi nomor WA seperti Register: hanya digit, 0xxxxx -> 62xxxxx
+  const normalizePhone = (value) => {
+    const digits = (value || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+    // '+62' akan menjadi '62' karena non-digit dihapus; baris berikut redundan tapi dibiarkan untuk konsistensi
+    if (digits.startsWith('+62')) return digits.replace(/^\+/, '');
+    return digits;
+  };
+
+  const goNext = () => {
+    setAttempted(true);
+    if (form.nama_instansi && form.atas_nama && form.jumlah_peserta && form.phone && form.email) {
+      navigation.navigate('NextP2');
+    }
+  };
+
+  const inputStyle = hasErr => ({
+    backgroundColor: '#FFFF',
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: hasErr ? '#C32A2A' : '#E9E9E9',
+    height: 45,
+    paddingHorizontal: 10,
+  });
+
+
 
   return (
     <View
@@ -73,16 +98,12 @@ function PengajuanScreen({navigation}) {
                 Nama Instansi Daerah Asal
               </Text>
               <TextInput
-                style={{
-                  backgroundColor: '#FFFF',
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: '#E9E9E9',
-                  height: 45,
-                  paddingHorizontal: 10,
-                }}
-                value={instansi}
-                onChangeText={setInstansi}></TextInput>
+                style={inputStyle((attempted && !form.nama_instansi) || submitErrors.nama_instansi)}
+                value={form.nama_instansi}
+                onChangeText={v => setField('nama_instansi', v)} />
+              {((attempted && !form.nama_instansi) || submitErrors.nama_instansi) && (
+                <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.nama_instansi || 'Wajib diisi'}</Text>
+              )}
             </View>
 
             <View style={{marginTop: 20}}>
@@ -95,16 +116,12 @@ function PengajuanScreen({navigation}) {
                 Atas Nama Pendaftar
               </Text>
               <TextInput
-                style={{
-                  backgroundColor: '#FFFF',
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: '#E9E9E9',
-                  height: 45,
-                  paddingHorizontal: 10,
-                }}
-                value={pendaftar}
-                onChangeText={setPendaftar}></TextInput>
+                style={inputStyle((attempted && !form.atas_nama) || submitErrors.atas_nama)}
+                value={form.atas_nama}
+                onChangeText={v => setField('atas_nama', v)} />
+              {((attempted && !form.atas_nama) || submitErrors.atas_nama) && (
+                <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.atas_nama || 'Wajib diisi'}</Text>
+              )}
             </View>
 
             <View style={{marginTop: 20}}>
@@ -117,16 +134,12 @@ function PengajuanScreen({navigation}) {
                 Jumlah Peserta
               </Text>
               <TextInput
-                style={{
-                  backgroundColor: '#FFFF',
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: '#E9E9E9',
-                  height: 45,
-                  paddingHorizontal: 10,
-                }}
-                value={jumlah}
-                onChangeText={setJumlah}></TextInput>
+                style={inputStyle((attempted && !form.jumlah_peserta) || submitErrors.jumlah_peserta)}
+                value={String(form.jumlah_peserta)}
+                onChangeText={v => setField('jumlah_peserta', v.replace(/[^0-9]/g,''))} />
+              {((attempted && !form.jumlah_peserta) || submitErrors.jumlah_peserta) && (
+                <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.jumlah_peserta || 'Wajib diisi'}</Text>
+              )}
             </View>
 
             <View style={{marginTop: 20}}>
@@ -139,23 +152,15 @@ function PengajuanScreen({navigation}) {
                 Nomor Whatsapp Instansi / Pendaftar
               </Text>
               <TextInput
-                style={{
-                  backgroundColor: '#FFFF',
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: '#E9E9E9',
-                  height: 45,
-                  paddingHorizontal: 10,
-                }}
-                value={nomor}
-                onChangeText={text => {
-                  // Filter hanya angka
-                  const numericText = text.replace(/[^0-9]/g, '');
-                  setNomor(numericText);
-                }}
+                style={inputStyle((attempted && !form.phone) || submitErrors.phone)}
+                value={form.phone}
+                onChangeText={text => setField('phone', normalizePhone(text))}
                 keyboardType="phone-pad"
                 maxLength={15}
               />
+              {((attempted && !form.phone) || submitErrors.phone) && (
+                <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.phone || 'Wajib diisi'}</Text>
+              )}
             </View>
 
             <View style={{marginTop: 20}}>
@@ -168,16 +173,12 @@ function PengajuanScreen({navigation}) {
                 Email Instansi / Pendaftar
               </Text>
               <TextInput
-                style={{
-                  backgroundColor: '#FFFF',
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: '#E9E9E9',
-                  height: 45,
-                  paddingHorizontal: 10,
-                }}
-                value={email}
-                onChangeText={setEmail}></TextInput>
+                style={inputStyle((attempted && !form.email) || submitErrors.email)}
+                value={form.email}
+                onChangeText={v => setField('email', v)} />
+              {((attempted && !form.email) || submitErrors.email) && (
+                <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.email || 'Wajib diisi'}</Text>
+              )}
             </View>
 
             <View
@@ -209,7 +210,7 @@ function PengajuanScreen({navigation}) {
               </View>
               <View>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('NextP2')}
+                  onPress={goNext}
                   style={{
                     backgroundColor: '#0386D0',
                     alignItems: 'center',

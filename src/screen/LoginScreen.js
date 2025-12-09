@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -11,14 +11,18 @@ import {
   Modal,
   ScrollView,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
+import {useAuth} from '../auth/AuthContext';
 
-function LoginScreen({navigation, route}) {
+function LoginScreen({navigation}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
   const [modalVisible2, setModalVisible2] = useState(false);
   const [successModalVisible2, setSuccessModalVisible2] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const {login} = useAuth();
 
   useFocusEffect(
     useCallback(() => {
@@ -36,9 +40,20 @@ function LoginScreen({navigation, route}) {
     }, []),
   );
 
-  function handleLogin() {
-    if (email && password) {
-      setModalVisible(true);
+  async function handleLogin() {
+    if (!email || !password) {
+      return;
+    }
+    setErrorMsg('');
+    setSubmitting(true);
+    try {
+      await login({email, password});
+      // Auth stack will switch to AppStack automatically
+    } catch (e) {
+      const message = e?.message || e?.data?.message || 'Login gagal, periksa kredensial Anda.';
+      setErrorMsg(message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -150,8 +165,10 @@ function LoginScreen({navigation, route}) {
               borderColor: '#CFCFCF',
             }}
             placeholder="Email Address"
-            onChangeText={Text => setEmail(Text)}
+            onChangeText={text => setEmail(text)}
             secureTextEntry={false}
+            autoCapitalize="none"
+            keyboardType="email-address"
           />
         </View>
         <View
@@ -191,10 +208,13 @@ function LoginScreen({navigation, route}) {
               borderColor: '#CFCFCF',
             }}
             placeholder="Password"
-            onChangeText={Text => setPassword(Text)}
+            onChangeText={text => setPassword(text)}
             secureTextEntry={true}
           />
         </View>
+        {!!errorMsg && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 10}}>{errorMsg}</Text>
+        )}
         <View style={{flex: 1}}>
           <TouchableOpacity
             onPress={handleLogin}
@@ -207,17 +227,22 @@ function LoginScreen({navigation, route}) {
               borderRadius: 10,
               justifyContent: 'center',
               alignItems: 'center',
+              opacity: submitting ? 0.8 : 1,
             }}
-            disabled={!email || !password}>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontFamily: 'DMSans-Regular',
-                fontWeight: 'semi-bold',
-                fontSize: 18,
-              }}>
-              Login
-            </Text>
+            disabled={!email || !password || submitting}>
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontFamily: 'DMSans-Regular',
+                  fontWeight: 'semi-bold',
+                  fontSize: 18,
+                }}>
+                Login
+              </Text>
+            )}
           </TouchableOpacity>
 
           <View style={{flex: 1}}>
@@ -239,52 +264,6 @@ function LoginScreen({navigation, route}) {
             </TouchableOpacity>
           </View>
 
-          {/* Modal untuk menampilkan notifikasi login berhasil */}
-          <Modal transparent={true} visible={modalVisible}>
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-              }}>
-              <View
-                style={{
-                  backgroundColor: '#FFF',
-                  padding: 20,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                }}>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    marginBottom: 10,
-                  }}>
-                  Login Berhasil
-                </Text>
-                <Text>Selamat Datang di E-Tamu</Text>
-                <TouchableOpacity
-                  style={{
-                    marginTop: 10,
-                    backgroundColor: '#007BFF',
-                    paddingVertical: 8,
-                    paddingHorizontal: 20,
-                    borderRadius: 5,
-                  }}
-                  onPress={() => navigation.navigate('Home')}>
-                  <Text
-                    style={{
-                      color: '#FFF',
-                      fontWeight: 'bold',
-                      fontFamily: 'DMSans-Regular',
-                    }}>
-                    Oke
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
 
           <View
             style={{

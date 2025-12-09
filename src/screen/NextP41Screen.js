@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,24 @@ import {
   StyleSheet,
 } from 'react-native';
 import DatePicker from 'react-native-date-picker';
+import {usePengajuan} from '../pengajuan/PengajuanContext';
 
 function NextP41Screen({navigation}) {
-  const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState(new Date());
+  const {setField, form, submitErrors} = usePengajuan();
+  const [date, setDate] = useState(form.tanggal_kunjungan ? new Date(form.tanggal_kunjungan) : new Date());
+  const [time, setTime] = useState(form.waktu_kunjungan ? new Date(`1970-01-01T${form.waktu_kunjungan}:00`) : new Date());
   const [openDate, setOpenDate] = useState(false);
   const [openTime, setOpenTime] = useState(false);
+
+  useEffect(() => {
+    const d = date.toISOString().split('T')[0];
+    setField('tanggal_kunjungan', d);
+  }, [date, setField]);
+  useEffect(() => {
+    const h = time.getHours().toString().padStart(2,'0');
+    const m = time.getMinutes().toString().padStart(2,'0');
+    setField('waktu_kunjungan', `${h}:${m}`);
+  }, [time, setField]);
 
   return (
     <View style={styles.container}>
@@ -58,6 +70,9 @@ function NextP41Screen({navigation}) {
             onCancel={() => setOpenDate(false)}
           />
         </View>
+        {!!submitErrors?.tanggal_kunjungan && (
+          <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.tanggal_kunjungan}</Text>
+        )}
 
         <View style={styles.pickerContainer}>
           {/* TOMBOL PILIH WAKTU */}
@@ -97,6 +112,9 @@ function NextP41Screen({navigation}) {
             onCancel={() => setOpenTime(false)}
           />
         </View>
+        {!!submitErrors?.waktu_kunjungan && (
+          <Text style={{color:'#C32A2A', fontSize:12, marginTop:4}}>{submitErrors.waktu_kunjungan}</Text>
+        )}
 
         <View style={{marginTop: 25, flexDirection: 'row'}}>
           <View>

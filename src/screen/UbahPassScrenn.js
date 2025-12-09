@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {
   View,
@@ -9,17 +9,71 @@ import {
   Image,
   ScrollView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
+import {useAuth} from '../auth/AuthContext';
 
 function UbahPassScreen({navigation}) {
   const [modalVisible, setModalVisible] = useState(false);
+  const {changePassword} = useAuth();
+
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({}); // { current_password?, password?, password_confirmation? }
 
   const handleBerhasil = () => {
     setModalVisible(true);
   };
 
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [newpassword, setNewpassword] = useState('');
+
+  const canSubmit = currentPassword && password && newpassword;
+
+  const onSubmit = async () => {
+    setErrorMsg('');
+    setFieldErrors({});
+    if (!canSubmit) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await changePassword({
+        current_password: currentPassword,
+        password: password,
+        password_confirmation: newpassword,
+      });
+      handleBerhasil();
+      // Reset fields after success
+      setCurrentPassword('');
+      setPassword('');
+      setNewpassword('');
+    } catch (e) {
+      // Prefer field-level errors if present
+      const apiErrors = e?.data?.errors;
+      if (apiErrors && typeof apiErrors === 'object') {
+        // Map only relevant fields; pick first message
+        const mapped = {};
+        if (apiErrors.current_password?.length) {
+          mapped.current_password = apiErrors.current_password[0];
+        }
+        if (apiErrors.password?.length) {
+          mapped.password = apiErrors.password[0];
+        }
+        if (apiErrors.password_confirmation?.length) {
+          mapped.password_confirmation = apiErrors.password_confirmation[0];
+        }
+        setFieldErrors(mapped);
+      } else {
+        const msg = e?.message || e?.data?.message || 'Gagal mengubah password';
+        setErrorMsg(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <View
@@ -102,6 +156,44 @@ function UbahPassScreen({navigation}) {
             }}>
             Password
           </Text>
+
+          {/* Password Lama */}
+          <Text
+            style={{
+              color: '#000',
+              fontFamily: 'DMSans-Regular',
+              fontSize: 15,
+              marginTop: 20,
+            }}>
+            Password Lama
+          </Text>
+          <TextInput
+            style={{
+              marginTop: 5,
+              backgroundColor: '#FFFF',
+              borderRadius: 15,
+              borderWidth: 1,
+              borderColor: fieldErrors.current_password ? '#C32A2A' : '#B1B1B1',
+              height: 45,
+              paddingHorizontal: 10,
+            }}
+            placeholder="Masukkan password lama"
+            value={currentPassword}
+            onChangeText={(v) => {
+              setCurrentPassword(v);
+              if (fieldErrors.current_password) {
+                setFieldErrors(prev => ({...prev, current_password: undefined}));
+              }
+            }}
+            autoCapitalize="none"
+            textContentType="password"
+            secureTextEntry
+          />
+          {fieldErrors.current_password ? (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.current_password}</Text>
+          ) : null}
+
+          {/* Password Baru */}
           <Text
             style={{
               color: '#000',
@@ -117,13 +209,27 @@ function UbahPassScreen({navigation}) {
               backgroundColor: '#FFFF',
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: '#B1B1B1',
+              borderColor: fieldErrors.password ? '#C32A2A' : '#B1B1B1',
               height: 45,
               paddingHorizontal: 10,
             }}
             placeholder="Silahkan masukkan password yang baru"
             value={password}
-            onChangeText={setPassword}></TextInput>
+            onChangeText={(v) => {
+              setPassword(v);
+              if (fieldErrors.password) {
+                setFieldErrors(prev => ({...prev, password: undefined}));
+              }
+            }}
+            autoCapitalize="none"
+            textContentType="newPassword"
+            secureTextEntry
+          />
+          {fieldErrors.password ? (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.password}</Text>
+          ) : null}
+
+          {/* Konfirmasi Password Baru */}
           <Text
             style={{
               color: '#000',
@@ -139,27 +245,49 @@ function UbahPassScreen({navigation}) {
               backgroundColor: '#FFFF',
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: '#B1B1B1',
+              borderColor: fieldErrors.password_confirmation ? '#C32A2A' : '#B1B1B1',
               height: 45,
               paddingHorizontal: 10,
             }}
             placeholder="Silahkan masukkan kembali password"
             value={newpassword}
-            onChangeText={setNewpassword}></TextInput>
+            onChangeText={(v) => {
+              setNewpassword(v);
+              if (fieldErrors.password_confirmation) {
+                setFieldErrors(prev => ({...prev, password_confirmation: undefined}));
+              }
+            }}
+            autoCapitalize="none"
+            textContentType="newPassword"
+            secureTextEntry
+          />
+          {fieldErrors.password_confirmation ? (
+            <Text style={{color: '#C32A2A', fontSize: 12, marginTop: 4}}>{fieldErrors.password_confirmation}</Text>
+          ) : null}
+
+          {/* General error for non-validation issues */}
+          {errorMsg ? (
+            <Text style={{color: 'red', marginTop: 12}}>{errorMsg}</Text>
+          ) : null}
         </View>
 
         <TouchableOpacity
-          onPress={handleBerhasil}
+          onPress={onSubmit}
           style={{
-            backgroundColor: password && newpassword ? '#0386D0' : '#ccc',
+            backgroundColor: canSubmit ? '#0386D0' : '#ccc',
             marginHorizontal: 30,
             marginTop: 30,
             paddingVertical: 15,
             borderRadius: 10,
             justifyContent: 'center',
             alignItems: 'center',
+            flexDirection: 'row',
+            gap: 8,
           }}
-          disabled={!password || !newpassword}>
+          disabled={!canSubmit || submitting}>
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" style={{marginRight: 8}} />
+          ) : null}
           <Text
             style={{
               color: '#FFFFFF',
@@ -167,7 +295,7 @@ function UbahPassScreen({navigation}) {
               fontWeight: 'semi-bold',
               fontSize: 18,
             }}>
-            Kirim
+            {submitting ? 'Menyimpan...' : 'Simpan'}
           </Text>
         </TouchableOpacity>
 

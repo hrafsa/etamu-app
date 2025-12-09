@@ -1,16 +1,7 @@
-import React, {useEffect} from 'react';
-import {View, Text, Image, StatusBar} from 'react-native';
-import {StackActions} from '@react-navigation/native';
+import React from 'react';
+import {View, Text, Image, StatusBar, ActivityIndicator} from 'react-native';
 
-const SplashScreen = ({navigation}) => {
-  useEffect(() => {
-    const interval = setTimeout(() => {
-      navigation.dispatch(StackActions.replace('Login'));
-    }, 1500);
-
-    return () => clearTimeout(interval);
-  }, []);
-
+const SplashScreen = () => {
   return (
     <View
       style={{
@@ -53,6 +44,7 @@ const SplashScreen = ({navigation}) => {
             resizeMode: 'contain',
           }}
         />
+        <ActivityIndicator style={{marginTop: 16}} color="#0E2F4F" />
       </View>
     </View>
   );

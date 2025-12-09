@@ -3,6 +3,8 @@
 import * as React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {AuthProvider, useAuth} from './src/auth/AuthContext';
+import {PengajuanProvider} from './src/pengajuan/PengajuanContext';
 
 //import screen
 import SplashScreen from './src/screen/SplashScreen';
@@ -28,117 +30,69 @@ import UbahPassScreen from './src/screen/UbahPassScrenn';
 
 const Stack = createNativeStackNavigator();
 
+// Auth-only screens
+function AuthStack() {
+  return (
+    <Stack.Navigator
+      initialRouteName="Login"
+      screenOptions={{gestureEnabled: true, animation: 'fade', headerShown: false}}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="LupaPassword" component={ForgotPassScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// App-only screens
+function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{gestureEnabled: true, animation: 'fade', headerShown: false}}>
+      {/* You can keep Splash out of the app stack; it will be shown as a loader in RootNavigator */}
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Notifikasi" component={NotifikasiScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Pengajuan" component={PengajuanScreen} />
+      <Stack.Screen name="NextP2" component={NextP2Screen} />
+      <Stack.Screen name="NextP31" component={NextP31Screen} />
+      <Stack.Screen name="NextP32" component={NextP32Screen} />
+      <Stack.Screen name="NextP41" component={NextP41Screen} />
+      <Stack.Screen name="NextP42" component={NextP42Screen} />
+      <Stack.Screen name="NextP51" component={NextP51Screen} />
+      <Stack.Screen name="NextP52" component={NextP52Screen} />
+      <Stack.Screen name="StsPengajuan" component={StsPengajuanScreen} />
+      <Stack.Screen name="Panduan" component={PanduanScreen} />
+      <Stack.Screen name="Riwayat" component={RiwayatScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="UbahPass" component={UbahPassScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function RootNavigator() {
+  const {isBootstrapping, userToken} = useAuth();
+
+  // While restoring token/user show Splash
+  if (isBootstrapping) {
+    return (
+      <Stack.Navigator screenOptions={{headerShown: false}}>
+        <Stack.Screen name="Splash" component={SplashScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  // If authenticated, show the app; else show auth screens
+  return userToken ? <AppStack /> : <AuthStack />;
+}
+
 function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          gestureEnabled: true, // Aktifkan gesture untuk swipe back
-          animation: 'fade', // Animasi perpindahan screen dari kanan ke kiri
-        }}>
-        <Stack.Screen
-          name="Splash"
-          component={SplashScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Notifikasi"
-          component={NotifikasiScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Pengajuan"
-          component={PengajuanScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP2"
-          component={NextP2Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP31"
-          component={NextP31Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP32"
-          component={NextP32Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP41"
-          component={NextP41Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP42"
-          component={NextP42Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP51"
-          component={NextP51Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="NextP52"
-          component={NextP52Screen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="StsPengajuan"
-          component={StsPengajuanScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Panduan"
-          component={PanduanScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="Riwayat"
-          component={RiwayatScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="LupaPassword"
-          component={ForgotPassScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="EditProfile"
-          component={EditProfileScreen}
-          options={{headerShown: false}}
-        />
-        <Stack.Screen
-          name="UbahPass"
-          component={UbahPassScreen}
-          options={{headerShown: false}}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <PengajuanProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </PengajuanProvider>
+    </AuthProvider>
   );
 }
 

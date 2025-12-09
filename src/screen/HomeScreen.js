@@ -13,10 +13,14 @@ import {
   BackHandler,
   RefreshControl,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
+import {useAuth} from '../auth/AuthContext';
+import api from '../api/client';
 
 function HomeScreen({navigation}) {
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // logout modal
+  const [exitModalVisible, setExitModalVisible] = useState(false); // exit app modal for hardware back
   const [ketVisible, setKetVisible] = useState(false);
   const [ketVisible2, setKetVisible2] = useState(false);
   const [ketVisible3, setKetVisible3] = useState(false);
@@ -24,13 +28,102 @@ function HomeScreen({navigation}) {
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(new Animated.Value(1))[0]; // Nilai awal opacity 1
 
+  const {logout, user} = useAuth();
+
+  // State untuk daftar kunjungan yang disetujui (hanya yang akan datang)
+  const [visits, setVisits] = useState([]);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [visitsError, setVisitsError] = useState('');
+  const [selectedVisit, setSelectedVisit] = useState(null);
+  // pagination state
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const parsePengajuanList = resData => {
+    // Bentuk backend: { status, message, data: { current_page, data: [ ... ] } }
+    if (Array.isArray(resData)) return { items: resData, currentPage: 1, lastPage: 1 };
+    if (resData?.data && Array.isArray(resData.data)) {
+      return { items: resData.data, currentPage: 1, lastPage: 1 };
+    }
+    const pg = resData?.data;
+    if (pg && typeof pg === 'object') {
+      const items = Array.isArray(pg.data) ? pg.data : [];
+      const currentPage = typeof pg.current_page === 'number' ? pg.current_page : 1;
+      const lastPageVal = typeof pg.last_page === 'number' ? pg.last_page : 1;
+      return { items, currentPage, lastPage: lastPageVal };
+    }
+    return { items: [], currentPage: 1, lastPage: 1 };
+  };
+
+  const toDateTime = (tanggal, waktu) => {
+    if (!tanggal) return null;
+    const t = waktu && /^\d{2}:\d{2}/.test(waktu) ? waktu : '23:59';
+    // Parse sebagai waktu lokal
+    const dt = new Date(`${tanggal}T${t}:00`);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const formatDateID = (tanggal) => {
+    try {
+      const d = new Date(`${tanggal}T00:00:00`);
+      return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+    } catch (_) { return tanggal; }
+  };
+
+  const fetchApproved = useCallback(async (targetPage = 1, append = false) => {
+    if (append) setLoadingMore(true); else setLoadingVisits(true);
+    setVisitsError('');
+    try {
+      const res = await api.get('/pengajuan', { params: { status: 'disetujui', page: targetPage } });
+      const { items, currentPage, lastPage: lp } = parsePengajuanList(res.data);
+      const mapped = items.map(item => ({
+        nomor_pengajuan: item.nomor_pengajuan,
+        nama_instansi: item.nama_instansi,
+        atas_nama: item.atas_nama,
+        jumlah_peserta: item.jumlah_peserta,
+        phone: item.phone,
+        email: item.email,
+        kategori_nama: item.kategori?.name || item.kategori?.nama || '',
+        sub_kategori_nama: item.sub_kategori?.name || item.sub_kategori?.nama || '',
+        tanggal_kunjungan: item.tanggal_kunjungan,
+        waktu_kunjungan: item.waktu_kunjungan,
+        tujuan: item.tujuan,
+        dokumen_url: item.dokumen_url,
+        status: item.status,
+        created_at: item.created_at,
+      }));
+      const now = new Date();
+      const upcoming = mapped.filter(v => {
+        const dt = toDateTime(v.tanggal_kunjungan, v.waktu_kunjungan);
+        return dt && dt >= now;
+      });
+      setPage(currentPage);
+      setLastPage(lp);
+      setVisits(prev => {
+        const combined = append ? [...prev, ...upcoming] : upcoming;
+        // sort ascending by datetime
+        return combined.sort((a,b) => {
+          const da = toDateTime(a.tanggal_kunjungan, a.waktu_kunjungan)?.getTime() || 0;
+          const db = toDateTime(b.tanggal_kunjungan, b.waktu_kunjungan)?.getTime() || 0;
+          return da - db;
+        });
+      });
+    } catch (e) {
+      if (!append) setVisits([]);
+      setVisitsError(e?.message || 'Gagal memuat daftar kunjungan');
+    } finally {
+      if (append) setLoadingMore(false); else setLoadingVisits(false);
+    }
+  }, []);
+
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1, // Fade in ke tampilan normal
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -48,12 +141,17 @@ function HomeScreen({navigation}) {
         useNativeDriver: true,
       }),
     ]).start(() => setRefreshing(false)); // Pastikan refresh berhenti setelah animasi
+
+    // Refresh data kunjungan juga
+    fetchApproved(1, false);
+    setPage(1);
   };
 
   useFocusEffect(
     useCallback(() => {
       const backAction = () => {
-        setModalVisible(true);
+        // Show exit app confirmation (do NOT logout)
+        setExitModalVisible(true);
         return true;
       };
 
@@ -62,12 +160,26 @@ function HomeScreen({navigation}) {
         backAction,
       );
 
-      return () => backHandler.remove(); // Hapus event listener saat screen tidak aktif
-    }, []),
+      // Muat data kunjungan saat screen difokuskan
+      fetchApproved(1, false);
+      setPage(1);
+
+      return () => backHandler.remove();
+    }, [fetchApproved])
   );
 
   const handleKeluar = () => {
+    // Explicit logout via bottom nav button
     setModalVisible(true);
+  };
+
+  const onConfirmLogout = async () => {
+    setModalVisible(false);
+    try {
+      await logout();
+    } catch (e) {
+      // ignore
+    }
   };
 
   const handleKeterangan = () => {
@@ -80,6 +192,17 @@ function HomeScreen({navigation}) {
 
   const handleKeterangan3 = () => {
     setKetVisible3(true);
+  };
+
+  const openVisitDetail = (v) => setSelectedVisit(v);
+  const closeVisitDetail = () => setSelectedVisit(null);
+
+  const loadMore = () => {
+    if (loadingMore) return;
+    const nextPage = page + 1;
+    if (nextPage <= lastPage) {
+      fetchApproved(nextPage, true);
+    }
   };
 
   return (
@@ -119,7 +242,7 @@ function HomeScreen({navigation}) {
             fontSize: 18,
             marginTop: 10,
           }}>
-          Hello (Nama User),
+          {`Hello ${user?.name || 'User'},`}
         </Text>
         <Text
           style={{
@@ -142,6 +265,7 @@ function HomeScreen({navigation}) {
           Dashboard
         </Text>
 
+        {/* Kartu menu dashboard (tetap seperti sebelumnya) */}
         <View
           style={{
             flex: 1,
@@ -292,6 +416,7 @@ function HomeScreen({navigation}) {
           </View>
         </View>
 
+        {/* List Kunjungan (Dynamic) */}
         <View>
           <Text
             style={{
@@ -304,525 +429,114 @@ function HomeScreen({navigation}) {
             List Kunjungan
           </Text>
         </View>
-        <View style={{flexDirection: 'column', flex: 1}}>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#97D9E4',
-              marginTop: 20,
-              alignContent: 'center',
-              alignItems: 'center',
-              padding: 10,
-              borderTopLeftRadius: 15,
-              borderTopRightRadius: 15,
-            }}>
-            <Text
-              style={{
-                color: '#000000',
-                fontFamily: 'DMSans-Regular',
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}>
-              Kunjungan Bertemu Dewan Komisi E
-            </Text>
-          </View>
 
-          {/* Modal Keterangan */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={ketVisible}
-            onRequestClose={() => setKetVisible(false)}>
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-              }}>
-              <View
-                style={{
-                  width: 300,
-                  backgroundColor: 'white',
-                  padding: 20,
-                  borderRadius: 10,
-                  //alignItems: 'center',
-                }}>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    alignSelf: 'center',
-                  }}>
-                  Keterangan
-                </Text>
+        {loadingVisits ? (
+          <Text style={{textAlign:'center', marginTop: 15}}>Memuat kunjungan...</Text>
+        ) : visitsError ? (
+          <Text style={{color:'#C32A2A', marginTop: 15, textAlign:'center'}}>{visitsError}</Text>
+        ) : visits.length === 0 ? (
+          <Text style={{textAlign:'center', marginTop: 15}}>Belum ada kunjungan disetujui yang akan datang.</Text>
+        ) : (
+          <>
+            {visits.map((v) => (
+              <View key={v.nomor_pengajuan} style={{flexDirection: 'column', flex: 1}}>
                 <View
                   style={{
-                    borderTopWidth: 1,
-                    borderBottomWidth: 1,
-                    marginVertical: 10,
-                    borderColor: '#B1B1B1',
-                  }}>
-                  <Text style={styles.modalKeterangan}>
-                    <Text style={{fontWeight: 'bold'}}>Nama Instansi : </Text>
-                    DPRD Kota Tanggerang
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Nama Pendafatar : </Text>
-                    Budi
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Jumlah Peserta : </Text>5
-                    Orang
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Nomor WA : </Text>
-                    08123456789
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
-                    user123@gmail.com
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
-                    Dewan Komisi E
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>
-                      Tanggal Kunjungan :{' '}
-                    </Text>
-                    16 Januari 2025
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Jam Kunjungan : </Text>
-                    08.00 WIB
-                  </Text>
-                  <Text style={styles.modalKeterangan3}>
-                    <Text style={{fontWeight: 'bold'}}>Keterangan : </Text>
-                    Bertemu dengan Dewan Komisi E di ruangan A, untuk berdiskusi
-                    masalah perihal masalah yang ada
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    marginTop: 10,
+                    flex: 1,
+                    backgroundColor: '#97D9E4',
+                    marginTop: 20,
+                    alignContent: 'center',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <TouchableOpacity
-                    onPress={() => setKetVisible(false)}
-                    style={{
-                      padding: 10,
-                      backgroundColor: '#007BFF',
-                      borderRadius: 5,
-                      marginRight: 10,
-                    }}>
-                    <Text style={{color: 'white', fontWeight: 'bold'}}>
-                      Oke
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          <View
-            style={{
-              flex: 1,
-              borderColor: '#00000020',
-              borderBottomWidth: 6,
-              borderLeftWidth: 1,
-              borderRightWidth: 1,
-              borderBottomLeftRadius: 15,
-              borderBottomRightRadius: 15,
-            }}>
-            <TouchableOpacity
-              onPress={handleKeterangan}
-              style={{
-                flex: 1,
-                backgroundColor: '#FFFF',
-                alignContent: 'center',
-                //elevation: 5,
-                padding: 12,
-                borderBottomLeftRadius: 15,
-                borderBottomRightRadius: 15,
-              }}>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                }}>
-                Tanggal Kunjungan: 16 Januari 2025
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Jam Kunjungan : 08.00 WIB
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Bertemu dengan Dewan Komisi E di ruangan A, untuk berdiskusi
-                perihal .....
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={{flexDirection: 'column', flex: 1}}>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#97D9E4',
-              marginTop: 30,
-              alignContent: 'center',
-              alignItems: 'center',
-              padding: 10,
-              borderTopLeftRadius: 15,
-              borderTopRightRadius: 15,
-            }}>
-            <Text
-              style={{
-                color: '#000000',
-                fontFamily: 'DMSans-Regular',
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}>
-              Kunjungan Bertemu Bagian Umum
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flex: 1,
-              borderColor: '#00000020',
-              borderBottomWidth: 6,
-              borderLeftWidth: 1,
-              borderRightWidth: 1,
-              borderBottomLeftRadius: 15,
-              borderBottomRightRadius: 15,
-            }}>
-            <TouchableOpacity
-              onPress={handleKeterangan2}
-              style={{
-                flex: 1,
-                backgroundColor: '#FFFF',
-                alignContent: 'center',
-                padding: 12,
-                borderBottomLeftRadius: 15,
-                borderBottomRightRadius: 15,
-              }}>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                }}>
-                Tanggal Kunjungan: 3 Februari 2025
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Jam Kunjungan : 10.00 WIB
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Bertemu dengan Bagian Umum di ruang Bagian Umum, membicarakan
-                mengenai perihal .....
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Modal Keterangan 2 */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={ketVisible2}
-          onRequestClose={() => setKetVisible2(false)}>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'rgba(0,0,0,0.5)',
-            }}>
-            <View
-              style={{
-                width: 300,
-                backgroundColor: 'white',
-                padding: 20,
-                borderRadius: 10,
-                //alignItems: 'center',
-              }}>
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  alignSelf: 'center',
-                }}>
-                Keterangan
-              </Text>
-              <View
-                style={{
-                  borderTopWidth: 1,
-                  borderBottomWidth: 1,
-                  marginVertical: 10,
-                  borderColor: '#B1B1B1',
-                }}>
-                <Text style={styles.modalKeterangan}>
-                  <Text style={{fontWeight: 'bold'}}>Nama Instansi : </Text>
-                  DPRD Kota Semarang
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Nama Pendafatar : </Text>
-                  Melisa
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Jumlah Peserta : </Text>7
-                  Orang
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Nomor WA : </Text>
-                  08123576890
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
-                  dprdsemarang123@gmail.com
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
-                  Bagian Umum
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Tanggal Kunjungan : </Text>
-                  3 Februari 2025
-                </Text>
-                <Text style={styles.modalKeterangan2}>
-                  <Text style={{fontWeight: 'bold'}}>Jam Kunjungan : </Text>
-                  10.00 WIB
-                </Text>
-                <Text style={styles.modalKeterangan3}>
-                  <Text style={{fontWeight: 'bold'}}>Keterangan : </Text>
-                  Bertemu dengan Bagian Umum di ruang Bagian Umum, membicarakan
-                  mengenai perihal masalah yang ada
-                </Text>
-              </View>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  marginTop: 10,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <TouchableOpacity
-                  onPress={() => setKetVisible2(false)}
-                  style={{
                     padding: 10,
-                    backgroundColor: '#007BFF',
-                    borderRadius: 5,
-                    marginRight: 10,
+                    borderTopLeftRadius: 15,
+                    borderTopRightRadius: 15,
                   }}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Oke</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        <View style={{flexDirection: 'column', flex: 1}}>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#97D9E4',
-              marginTop: 30,
-              alignContent: 'center',
-              alignItems: 'center',
-              padding: 10,
-              borderTopLeftRadius: 15,
-              borderTopRightRadius: 15,
-            }}>
-            <Text
-              style={{
-                color: '#000000',
-                fontFamily: 'DMSans-Regular',
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}>
-              Kunjungan Bertemu Pimpinan Dewan
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flex: 1,
-              borderColor: '#00000020',
-              borderBottomWidth: 6,
-              borderLeftWidth: 1,
-              borderRightWidth: 1,
-              borderBottomLeftRadius: 15,
-              borderBottomRightRadius: 15,
-            }}>
-            <TouchableOpacity
-              onPress={handleKeterangan3}
-              style={{
-                flex: 1,
-                backgroundColor: '#FFFF',
-                alignContent: 'center',
-                padding: 12,
-                borderBottomLeftRadius: 15,
-                borderBottomRightRadius: 15,
-              }}>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                }}>
-                Tanggal Kunjungan: 17 Februari 2025
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Jam Kunjungan : 13.30 WIB
-              </Text>
-              <Text
-                style={{
-                  color: '#000000',
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 12,
-                  marginTop: 7,
-                }}>
-                Bertemu dengan Pimpinan Dewan di ruang rapat dewan, berdiskusi
-                mengenai hal .....
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Modal Keterangan 3 */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={ketVisible3}
-            onRequestClose={() => setKetVisible3(false)}>
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'rgba(0,0,0,0.5)',
-              }}>
-              <View
-                style={{
-                  width: 300,
-                  backgroundColor: 'white',
-                  padding: 20,
-                  borderRadius: 10,
-                  //alignItems: 'center',
-                }}>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    alignSelf: 'center',
-                  }}>
-                  Keterangan
-                </Text>
-                <View
-                  style={{
-                    borderTopWidth: 1,
-                    borderBottomWidth: 1,
-                    marginVertical: 10,
-                    borderColor: '#B1B1B1',
-                  }}>
-                  <Text style={styles.modalKeterangan}>
-                    <Text style={{fontWeight: 'bold'}}>Nama Instansi : </Text>
-                    DPRD Kota Jambi
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Nama Pendafatar : </Text>
-                    Anto
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Jumlah Peserta : </Text>3
-                    Orang
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Nomor WA : </Text>
-                    08139987009
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
-                    dprdjambi123@gmail.com
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
-                    Pimpinan Dewan
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>
-                      Tanggal Kunjungan :{' '}
-                    </Text>
-                    17 Februari 2025
-                  </Text>
-                  <Text style={styles.modalKeterangan2}>
-                    <Text style={{fontWeight: 'bold'}}>Jam Kunjungan : </Text>
-                    13.30 WIB
-                  </Text>
-                  <Text style={styles.modalKeterangan3}>
-                    <Text style={{fontWeight: 'bold'}}>Keterangan : </Text>
-                    Bertemu dengan Pimpinan Dewan di ruang rapat dewan, untuk
-                    berdiskusi mengenai hal yang berkaitan dengan masalah yang
-                    ada
+                  <Text
+                    style={{
+                      color: '#000000',
+                      fontFamily: 'DMSans-Regular',
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                    }}>
+                    {`Kunjungan Bertemu ${v.sub_kategori_nama || v.kategori_nama || '-'}`}
                   </Text>
                 </View>
+
                 <View
                   style={{
-                    flexDirection: 'row',
-                    marginTop: 10,
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    flex: 1,
+                    borderColor: '#00000020',
+                    borderBottomWidth: 6,
+                    borderLeftWidth: 1,
+                    borderRightWidth: 1,
+                    borderBottomLeftRadius: 15,
+                    borderBottomRightRadius: 15,
                   }}>
                   <TouchableOpacity
-                    onPress={() => setKetVisible3(false)}
+                    onPress={() => openVisitDetail(v)}
                     style={{
-                      padding: 10,
-                      backgroundColor: '#007BFF',
-                      borderRadius: 5,
-                      marginRight: 10,
+                      flex: 1,
+                      backgroundColor: '#FFFF',
+                      alignContent: 'center',
+                      padding: 12,
+                      borderBottomLeftRadius: 15,
+                      borderBottomRightRadius: 15,
                     }}>
-                    <Text style={{color: 'white', fontWeight: 'bold'}}>
-                      Oke
+                    <Text
+                      style={{
+                        color: '#000000',
+                        fontFamily: 'DMSans-Regular',
+                        fontSize: 12,
+                      }}>
+                      {`Tanggal Kunjungan: ${formatDateID(v.tanggal_kunjungan)}`}
+                    </Text>
+                    <Text
+                      style={{
+                        color: '#000000',
+                        fontFamily: 'DMSans-Regular',
+                        fontSize: 12,
+                        marginTop: 7,
+                      }}>
+                      {`Jam Kunjungan : ${v.waktu_kunjungan || '-' } WIB`}
+                    </Text>
+                    <Text
+                      style={{
+                        color: '#000000',
+                        fontFamily: 'DMSans-Regular',
+                        fontSize: 12,
+                        marginTop: 7,
+                      }}>
+                      {`Bertemu dengan ${v.sub_kategori_nama || v.kategori_nama || '-'}, ${v.tujuan || ''}`}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </Modal>
-        </View>
+            ))}
+            {page < lastPage && (
+              <View style={{marginTop: 16, alignItems: 'center'}}>
+                <TouchableOpacity
+                  onPress={loadMore}
+                  disabled={loadingMore}
+                  style={{
+                    backgroundColor: '#0386D0',
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    opacity: loadingMore ? 0.7 : 1,
+                  }}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={{color:'#FFF', fontFamily:'DMSans-Regular'}}>Muat lagi</Text>
+                  )}
+                </TouchableOpacity>
+                <Text style={{marginTop:6, color:'#666'}}>{`Halaman ${page} dari ${lastPage}`}</Text>
+              </View>
+            )}
+          </>
+        )}
+
         <View style={{marginTop: 10, marginBottom: 10}}>
           <Text style={{color: '#FFFF'}}>--DPRD DKI JAKARTA--</Text>
         </View>
@@ -897,8 +611,8 @@ function HomeScreen({navigation}) {
           </Text>
         </View>
 
-        {/* Modal Konfirmasi */}
-        <Modal transparent={true} visible={modalVisible}>
+        {/* Logout Confirmation Modal (explicit Keluar button) */}
+        <Modal transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
           <View
             style={{
               flex: 1,
@@ -921,7 +635,7 @@ function HomeScreen({navigation}) {
                   textAlign: 'center',
                   marginVertical: 10,
                 }}>
-                Apakah Anda yakin ingin keluar dari E-Tamu?
+                Apakah Anda yakin ingin keluar dari akun anda?
               </Text>
               <View style={{flexDirection: 'row', marginTop: 10}}>
                 <TouchableOpacity
@@ -937,10 +651,7 @@ function HomeScreen({navigation}) {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => {
-                    setModalVisible(false);
-                    setSuccessModalVisible(true);
-                  }}
+                  onPress={onConfirmLogout}
                   style={{
                     padding: 10,
                     backgroundColor: '#007bff',
@@ -953,11 +664,8 @@ function HomeScreen({navigation}) {
           </View>
         </Modal>
 
-        {/* Modal Sukses */}
-        <Modal
-          // animationType="fade"
-          transparent={true}
-          visible={successModalVisible}>
+        {/* Exit App Confirmation Modal (hardware back) */}
+        <Modal transparent={true} visible={exitModalVisible} onRequestClose={() => setExitModalVisible(false)}>
           <View
             style={{
               flex: 1,
@@ -973,30 +681,114 @@ function HomeScreen({navigation}) {
                 borderRadius: 10,
                 alignItems: 'center',
               }}>
-              <Text style={{fontSize: 18, fontWeight: 'bold'}}>
-                Sampai Jumpa
-              </Text>
+              <Text style={{fontSize: 18, fontWeight: 'bold'}}>Konfirmasi</Text>
               <Text
                 style={{
                   fontSize: 14,
                   textAlign: 'center',
                   marginVertical: 10,
                 }}>
-                Anda telah keluar dari aplikasi E-Tamu, Sampai Jumpa...
+                Apakah Anda yakin ingin keluar dari aplikasi?
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setSuccessModalVisible(false);
-                  navigation.navigate('Login');
-                }}
-                style={{
-                  marginTop: 10,
-                  padding: 10,
-                  backgroundColor: '#007bff',
-                  borderRadius: 5,
-                }}>
-                <Text style={{color: 'white', fontWeight: 'bold'}}>Oke</Text>
-              </TouchableOpacity>
+              <View style={{flexDirection: 'row', marginTop: 10}}>
+                <TouchableOpacity
+                  onPress={() => setExitModalVisible(false)}
+                  style={{
+                    padding: 10,
+                    backgroundColor: '#C32A2A',
+                    borderRadius: 5,
+                    marginRight: 10,
+                  }}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>
+                    Tidak
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setExitModalVisible(false);
+                    BackHandler.exitApp();
+                  }}
+                  style={{
+                    padding: 10,
+                    backgroundColor: '#007bff',
+                    borderRadius: 5,
+                  }}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Ya</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Detail Kunjungan Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={!!selectedVisit}
+          onRequestClose={closeVisitDetail}
+        >
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0,0,0,0.5)',
+            }}>
+            <View
+              style={{
+                width: 300,
+                backgroundColor: 'white',
+                padding: 20,
+                borderRadius: 10,
+              }}>
+              <Text style={{fontSize: 18, fontWeight: 'bold', alignSelf: 'center'}}>Keterangan</Text>
+              <View style={{borderTopWidth: 1, borderBottomWidth: 1, marginVertical: 10, borderColor: '#B1B1B1'}}>
+                <Text style={styles.modalKeterangan}>
+                  <Text style={{fontWeight: 'bold'}}>Nomor Pengajuan : </Text>
+                  {selectedVisit?.nomor_pengajuan || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Nama Instansi : </Text>
+                  {selectedVisit?.nama_instansi || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Nama Pendaftar : </Text>
+                  {selectedVisit?.atas_nama || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Jumlah Peserta : </Text>
+                  {selectedVisit?.jumlah_peserta || '-'} Orang
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Nomor WA : </Text>
+                  {selectedVisit?.phone || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Email Address : </Text>
+                  {selectedVisit?.email || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Bertemu Dengan : </Text>
+                  {selectedVisit?.sub_kategori_nama || selectedVisit?.kategori_nama || '-'}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Tanggal Kunjungan : </Text>
+                  {formatDateID(selectedVisit?.tanggal_kunjungan)}
+                </Text>
+                <Text style={styles.modalKeterangan2}>
+                  <Text style={{fontWeight: 'bold'}}>Jam Kunjungan : </Text>
+                  {selectedVisit?.waktu_kunjungan || '-'} WIB
+                </Text>
+                <Text style={styles.modalKeterangan3}>
+                  <Text style={{fontWeight: 'bold'}}>Keterangan : </Text>
+                  {selectedVisit?.tujuan || '-'}
+                </Text>
+              </View>
+              <View style={{flexDirection: 'row', marginTop: 10, alignItems: 'center', justifyContent: 'center'}}>
+                <TouchableOpacity onPress={closeVisitDetail} style={{padding: 10, backgroundColor: '#007BFF', borderRadius: 5, marginRight: 10}}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Oke</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>

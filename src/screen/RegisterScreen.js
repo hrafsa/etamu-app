@@ -9,7 +9,9 @@ import {
   Image,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
+import {useAuth} from '../auth/AuthContext';
 
 function RegisterScreen({navigation}) {
   const [email, setEmail] = useState('');
@@ -18,12 +20,93 @@ function RegisterScreen({navigation}) {
   const [phone, setPhone] = useState('');
   const [fixpassword, setFixpassword] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  // state untuk error per field sesuai key dari API (name, email, phone, password, password_confirmation)
+  const [fieldErrors, setFieldErrors] = useState({});
+  const {register, login} = useAuth();
 
-  const handleRegister = () => {
-    if (email && password && user && phone && fixpassword) {
+  // Normalisasi nomor telepon: hanya digit, dan jika diawali "0" ubah ke "62"
+  const normalizePhone = (value) => {
+    const digits = (value || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+    if (digits.startsWith('+62')) return digits.replace(/^\+/, '');
+    return digits;
+  };
+
+  const handleRegister = async () => {
+    if (!email || !password || !user || !phone || !fixpassword) return;
+    // Reset error global & field
+    setErrorMsg('');
+    setFieldErrors({});
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: user,
+        email: email,
+        phone: normalizePhone(phone),
+        password: password,
+        password_confirmation: fixpassword,
+      };
+      const res = await register(payload);
+      if (!res?.token) {
+        try {
+          await login({email, password});
+        } catch (e) {
+          // ignore
+        }
+      }
       setModalVisible(true);
+    } catch (e) {
+      const apiErrors = e?.data?.errors;
+      if (apiErrors && typeof apiErrors === 'object') {
+        const parsed = {};
+        Object.entries(apiErrors).forEach(([k, v]) => {
+          if (Array.isArray(v)) parsed[k] = v[0];
+          else if (typeof v === 'string') parsed[k] = v;
+        });
+        // Jika pesan mismatch hanya ada di password, duplikasi ke konfirmasi
+        if (parsed.password && /confirmation/i.test(parsed.password) && !parsed.password_confirmation) {
+          parsed.password_confirmation = parsed.password;
+        }
+        setFieldErrors(parsed);
+        setErrorMsg(e?.data?.message || e?.message || 'Registrasi gagal');
+      } else {
+        const message = e?.message || e?.data?.message || 'Registrasi gagal, periksa data Anda.';
+        setErrorMsg(message);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  // Helper untuk styling border: jika ada error field => merah
+  const inputBorder = hasError => ({
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderColor: hasError ? '#C32A2A' : '#CFCFCF',
+    backgroundColor: '#FFFFFF',
+    flex: 1,
+  });
+
+  const iconBoxStyle = hasError => ({
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
+    paddingVertical: 12,
+    width: 40,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: hasError ? '#C32A2A' : '#CFCFCF',
+  });
 
   return (
     <ScrollView
@@ -96,6 +179,7 @@ function RegisterScreen({navigation}) {
           </TouchableOpacity>
         </View>
 
+        {/* NAME */}
         <View
           style={{
             flex: 1,
@@ -103,41 +187,27 @@ function RegisterScreen({navigation}) {
             marginHorizontal: 30,
             marginTop: 20,
           }}>
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              paddingVertical: 12,
-              width: 40,
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderColor: '#CFCFCF',
-            }}>
-            <Icon name="person" size={25} color="#A6A6A6" />
+          <View style={iconBoxStyle(!!fieldErrors.name)}>
+            <Icon name="person" size={25} color={fieldErrors.name ? '#C32A2A' : '#A6A6A6'} />
           </View>
           <TextInput
             value={user}
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              paddingVertical: 15,
-              borderBottomWidth: 1,
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderColor: '#CFCFCF',
-            }}
+            style={inputBorder(!!fieldErrors.name)}
             placeholder="Nama Lengkap"
-            onChangeText={Text => setUser(Text)}
+            onChangeText={Text => {
+              setUser(Text);
+              if (fieldErrors.name) setFieldErrors(prev => ({...prev, name: undefined}));
+            }}
             secureTextEntry={false}
           />
         </View>
+        {!!fieldErrors.name && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 4, fontSize: 12}}>
+            {fieldErrors.name}
+          </Text>
+        )}
 
+        {/* PHONE */}
         <View
           style={{
             flex: 1,
@@ -145,46 +215,29 @@ function RegisterScreen({navigation}) {
             marginHorizontal: 30,
             marginTop: 12,
           }}>
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              paddingVertical: 12,
-              width: 40,
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderColor: '#CFCFCF',
-            }}>
-            <Icon name="phone" size={25} color="#A6A6A6" />
+          <View style={iconBoxStyle(!!fieldErrors.phone)}>
+            <Icon name="phone" size={25} color={fieldErrors.phone ? '#C32A2A' : '#A6A6A6'} />
           </View>
           <TextInput
             value={phone}
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              paddingVertical: 15,
-              borderBottomWidth: 1,
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderColor: '#CFCFCF',
-            }}
+            style={inputBorder(!!fieldErrors.phone)}
             placeholder="Nomor Telephone WA"
             onChangeText={text => {
-              // Filter hanya angka
-              const numericText = text.replace(/[^0-9]/g, '');
-              setPhone(numericText);
+              const normalized = normalizePhone(text);
+              setPhone(normalized);
+              if (fieldErrors.phone) setFieldErrors(prev => ({...prev, phone: undefined}));
             }}
             keyboardType="phone-pad"
             maxLength={15}
           />
         </View>
+        {!!fieldErrors.phone && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 4, fontSize: 12}}>
+            {fieldErrors.phone}
+          </Text>
+        )}
 
+        {/* EMAIL */}
         <View
           style={{
             flex: 1,
@@ -192,41 +245,29 @@ function RegisterScreen({navigation}) {
             marginHorizontal: 30,
             marginTop: 12,
           }}>
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              paddingVertical: 12,
-              width: 40,
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderColor: '#CFCFCF',
-            }}>
-            <Icon name="mail" size={25} color="#A6A6A6" />
+          <View style={iconBoxStyle(!!fieldErrors.email)}>
+            <Icon name="mail" size={25} color={fieldErrors.email ? '#C32A2A' : '#A6A6A6'} />
           </View>
           <TextInput
             value={email}
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              paddingVertical: 15,
-              borderBottomWidth: 1,
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderColor: '#CFCFCF',
-            }}
+            style={inputBorder(!!fieldErrors.email)}
             placeholder="Email Address"
-            onChangeText={Text => setEmail(Text)}
+            onChangeText={Text => {
+              setEmail(Text);
+              if (fieldErrors.email) setFieldErrors(prev => ({...prev, email: undefined}));
+            }}
             secureTextEntry={false}
+            autoCapitalize="none"
+            keyboardType="email-address"
           />
         </View>
+        {!!fieldErrors.email && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 4, fontSize: 12}}>
+            {fieldErrors.email}
+          </Text>
+        )}
 
+        {/* PASSWORD */}
         <View
           style={{
             flex: 1,
@@ -234,41 +275,32 @@ function RegisterScreen({navigation}) {
             marginHorizontal: 30,
             marginTop: 12,
           }}>
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              paddingVertical: 12,
-              width: 40,
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderColor: '#CFCFCF',
-            }}>
-            <Icon name="lock" size={25} color="#A6A6A6" />
+          <View style={iconBoxStyle(!!fieldErrors.password)}>
+            <Icon name="lock" size={25} color={fieldErrors.password ? '#C32A2A' : '#A6A6A6'} />
           </View>
           <TextInput
             value={password}
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              paddingVertical: 15,
-              borderBottomWidth: 1,
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderColor: '#CFCFCF',
-            }}
+            style={inputBorder(!!fieldErrors.password)}
             placeholder="Password"
-            onChangeText={Text => setPassword(Text)}
+            onChangeText={Text => {
+              setPassword(Text);
+              setFieldErrors(prev => {
+                const next = {...prev};
+                if (next.password) next.password = undefined;
+                if (Text === fixpassword && next.password_confirmation) next.password_confirmation = undefined;
+                return next;
+              });
+            }}
             secureTextEntry={true}
           />
         </View>
+        {!!fieldErrors.password && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 4, fontSize: 12}}>
+            {fieldErrors.password}
+          </Text>
+        )}
 
+        {/* CONFIRM PASSWORD */}
         <View
           style={{
             flex: 1,
@@ -276,40 +308,33 @@ function RegisterScreen({navigation}) {
             marginHorizontal: 30,
             marginTop: 12,
           }}>
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              paddingVertical: 12,
-              width: 40,
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderColor: '#CFCFCF',
-            }}>
-            <Icon name="lock-clock" size={25} color="#A6A6A6" />
-          </View>
-          <TextInput
-            value={fixpassword}
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              paddingVertical: 15,
-              borderBottomWidth: 1,
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderColor: '#CFCFCF',
-            }}
-            placeholder="Confirm Password"
-            onChangeText={Text => setFixpassword(Text)}
-            secureTextEntry={true}
-          />
+            <View style={iconBoxStyle(!!fieldErrors.password_confirmation)}>
+              <Icon name="lock-clock" size={25} color={fieldErrors.password_confirmation ? '#C32A2A' : '#A6A6A6'} />
+            </View>
+            <TextInput
+              value={fixpassword}
+              style={inputBorder(!!fieldErrors.password_confirmation)}
+              placeholder="Confirm Password"
+              onChangeText={Text => {
+                setFixpassword(Text);
+                setFieldErrors(prev => {
+                  const next = {...prev};
+                  if (next.password_confirmation) next.password_confirmation = undefined;
+                  if (password === Text && next.password) next.password = undefined; // jika backend taruh mismatch di password
+                  return next;
+                });
+              }}
+              secureTextEntry={true}
+            />
         </View>
+        {!!fieldErrors.password_confirmation && (
+          <Text style={{color: '#C32A2A', marginHorizontal: 30, marginTop: 4, fontSize: 12}}>
+            {fieldErrors.password_confirmation}
+          </Text>
+        )}
+
+        {/* Pesan error umum (misal Validation failed) */}
+
 
         <View style={{flex: 1}}>
           <TouchableOpacity
@@ -326,16 +351,22 @@ function RegisterScreen({navigation}) {
               borderRadius: 10,
               justifyContent: 'center',
               alignItems: 'center',
-            }}>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontFamily: 'DMSans-Regular',
-                fontWeight: 'semi-bold',
-                fontSize: 18,
-              }}>
-              Register
-            </Text>
+              opacity: submitting ? 0.8 : 1,
+            }}
+            disabled={!(email && password && user && phone && fixpassword) || submitting}>
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontFamily: 'DMSans-Regular',
+                  fontWeight: 'semi-bold',
+                  fontSize: 18,
+                }}>
+                Register
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* Modal untuk menampilkan notifikasi register berhasil */}

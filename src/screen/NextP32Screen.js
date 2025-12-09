@@ -8,28 +8,23 @@ import {
   Image,
   StyleSheet,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
+import {usePengajuan} from '../pengajuan/PengajuanContext';
 
-//import React from 'react';
-
-function NextP32Screen({navigation}) {
-  const [selected2, setSelected2] = useState('');
+function NextP32Screen({navigation, route}) {
+  const {form, setField, fetchSubCategories, subCategories, loadingSubCategories, submitErrors} = usePengajuan();
+  const [selected2, setSelected2] = useState(form.sub_kategori ? String(form.sub_kategori) : '');
   const [modalVisible, setModalVisible] = useState(false);
 
-  const option = [
-    {id: 'Bagian Umum', label: 'Bagian Umum'},
-    {
-      id: 'Bagian Perencanaan dan Keuangan',
-      label: 'Bagian Perencanaan dan Keuangan',
-    },
-    {
-      id: 'Bagian Produk Hukum dan Persidangan',
-      label: 'Bagian Produk Hukum dan Persidangan',
-    },
-    {
-      id: 'Hubungan Masyarakat dan Protokol',
-      label: 'Hubungan Masyarakat dan Protokol',
-    },
-  ];
+  const effectiveCategoryId = route?.params?.categoryId ?? form.kategori;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (effectiveCategoryId) {
+        fetchSubCategories(effectiveCategoryId, {force: true});
+      }
+    }, [effectiveCategoryId, fetchSubCategories])
+  );
 
   const handleNext = () => {
     if (!selected2) {
@@ -38,6 +33,14 @@ function NextP32Screen({navigation}) {
       navigation.navigate('NextP42');
     }
   };
+
+  const onSelect = (id, name) => {
+    setSelected2(String(id));
+    setField('sub_kategori', id);
+    setField('sub_kategori_name', name);
+  };
+
+  const subOptions = Array.isArray(subCategories) ? subCategories : [];
 
   return (
     <View
@@ -87,20 +90,29 @@ function NextP32Screen({navigation}) {
         </View>
 
         <View>
-          {option.map(option => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.option}
-              onPress={() => setSelected2(option.id)}>
-              <View
-                style={[
-                  styles.radio,
-                  selected2 === option.id && styles.radioselected2,
-                ]}
-              />
-              <Text style={styles.label}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {loadingSubCategories ? (
+            <Text style={{textAlign:'center', marginBottom:10}}>Memuat sub-kategori...</Text>
+          ) : subOptions.length === 0 ? (
+            <Text style={{textAlign:'center', marginBottom:10}}>Tidak ada sub-kategori.</Text>
+          ) : (
+            subOptions.map(option => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.option}
+                onPress={() => onSelect(option.id, option.name)}>
+                <View
+                  style={[
+                    styles.radio,
+                    selected2 === String(option.id) && styles.radioselected2,
+                  ]}
+                />
+                <Text style={styles.label}>{option.name}</Text>
+              </TouchableOpacity>
+            ))
+          )}
+          {!!submitErrors?.sub_kategori && (
+            <Text style={{color:'#C32A2A', fontSize:12, marginTop:4, textAlign:'center'}}>{submitErrors.sub_kategori}</Text>
+          )}
         </View>
 
         <View
